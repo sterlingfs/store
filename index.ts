@@ -1,3 +1,2 @@
-export const store = {
-  store: 0
-}
+export { Store } from "./src/store";
+export { Action } from "./src/interfaces/action";
