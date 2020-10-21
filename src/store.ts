@@ -1,61 +1,58 @@
 import { Subject, merge, zip } from "rxjs";
 import { Action } from "./interfaces/action";
 
-import { filter, scan, shareReplay, tap } from "rxjs/operators";
+import { filter, scan, shareReplay } from "rxjs/operators";
 
 export type ActionCallback = (action: Action) => void;
-export type SubscriptionCallback = <T>(
-  context: [action: Action, state: T]
+export type SubscriptionCallback = <S>(
+  context: [action: Action, state: S]
 ) => void;
 
-const INIT_STORE = "INIT_STORE";
+export function Store<S>(
+  rootReducer: (state: S, action: Action) => S,
+  initState?: S
+) {
+  const INIT_STORE = "INIT_STORE";
 
-export class Store<T> {
-  private readonly willDispatch$ = new Subject<Action>();
-  private readonly dispatch$ = new Subject<Action>();
-
-  private readonly pushState$ = new Subject<T>();
-
-  private readonly reducer$ = this.dispatch$.pipe(
+  const willDispatch$ = new Subject<Action>();
+  const dispatch$ = new Subject<Action>();
+  const pushState$ = new Subject<S>();
+  const reducer$ = dispatch$.pipe(
     filter(({ type }) => type !== INIT_STORE),
-    scan(this.rootReducer, {} as T)
+    scan(rootReducer, {} as S)
   );
 
-  private state$ = merge(this.reducer$, this.pushState$).pipe(
+  const state$ = merge(reducer$, pushState$).pipe(
     scan((a, c) => ({ ...a, ...c }), {})
   );
 
-  private readonly subscribe$ = zip(this.dispatch$, this.state$).pipe(
-    shareReplay(1)
-  );
+  const subscribe$ = zip(dispatch$, state$).pipe(shareReplay(1));
 
-  constructor(
-    private readonly rootReducer: (state: T, action: Action) => T,
-    initState?: T
-  ) {
-    this.subscribe$.toPromise().then(() => {});
-    this.dispatch$.next({ type: INIT_STORE, payload: initState });
-    initState && this.pushState$.next(initState);
+  subscribe$.toPromise().then(() => {});
+  dispatch$.next({ type: INIT_STORE, payload: initState });
+  initState && pushState$.next(initState);
+
+  // Interface
+  function pushState(state: S) {
+    pushState$.next(state);
   }
 
-  public pushState(state: T) {
-    this.pushState$.next(state);
+  function dispatch(action: Action) {
+    willDispatch$.next(action);
+    dispatch$.next(action);
   }
 
-  public dispatch(action: Action) {
-    this.willDispatch$.next(action);
-    this.dispatch$.next(action);
+  function subscribe(callback: SubscriptionCallback) {
+    subscribe$.subscribe(callback);
   }
 
-  public subscribe(callback: SubscriptionCallback) {
-    this.subscribe$.subscribe(callback);
+  function subscribeDispatch(callback: ActionCallback) {
+    dispatch$.subscribe(callback);
   }
 
-  public subscribeDispatch(callback: ActionCallback) {
-    this.dispatch$.subscribe(callback);
+  function willDispatch(callback: ActionCallback) {
+    willDispatch$.subscribe(callback);
   }
 
-  public willDispatch(callback: ActionCallback) {
-    this.willDispatch$.subscribe(callback);
-  }
+  return { pushState, dispatch, subscribe, subscribeDispatch, willDispatch };
 }

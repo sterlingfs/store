@@ -22,7 +22,7 @@ const initState: State = {
   },
 };
 
-const store = new Store<State>((state, action) => {
+const store = Store<State>((state, action) => {
   return {
     ...state,
     [action.type]: action.payload,
@@ -56,14 +56,14 @@ store.dispatch(action1);
 
 const action2 = {
   type: ActionType.initPage,
-  payload: { status: "screwed", pageNumber: 1 },
+  payload: { status: "awaiting", pageNumber: null },
 };
 
 store.dispatch(action2);
 
 const action3 = {
-  type: "WRITE_IN",
-  payload: { status: "screwed", pageNumber: 1 },
+  type: ActionType.initPage,
+  payload: { status: "resolved", pageNumber: 23 },
 };
 
 store.dispatch(action3);
