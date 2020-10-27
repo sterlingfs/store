@@ -4,14 +4,25 @@ import { Action } from "./interfaces/action";
 import { filter, scan, shareReplay } from "rxjs/operators";
 
 export type ActionCallback = (action: Action) => void;
-export type SubscriptionCallback = <S>(
-  context: [action: Action, state: S]
-) => void;
+export type Context<S> = { action: Action; state: S };
+export type SubscriptionCallback = <S>(context: Context<S>) => void;
 
-export function Store<S>(
+export interface Store<S> {
+  pushState(state: S): void;
+
+  dispatch(action: Action): void;
+
+  subscribe(callback: SubscriptionCallback): void;
+
+  subscribeDispatch(callback: ActionCallback): void;
+
+  willDispatch(callback: ActionCallback): void;
+}
+
+export function Store<S = any>(
   rootReducer: (state: S, action: Action) => S,
   initState?: S
-) {
+): Store<S> {
   const INIT_STORE = "INIT_STORE";
 
   const willDispatch$ = new Subject<Action>();
@@ -26,7 +37,10 @@ export function Store<S>(
     scan((a, c) => ({ ...a, ...c }), {})
   );
 
-  const subscribe$ = zip(dispatch$, state$).pipe(shareReplay(1));
+  const subscribe$ = zip(dispatch$, state$, (action, state) => ({
+    action,
+    state,
+  })).pipe(shareReplay(1));
 
   subscribe$.toPromise().then(() => {});
   dispatch$.next({ type: INIT_STORE, payload: initState });
